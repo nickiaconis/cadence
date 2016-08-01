@@ -8,7 +8,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.BitmapFactory;
 import android.os.Build;
-import android.os.Handler;
 import android.os.IBinder;
 import android.os.Vibrator;
 import android.support.v4.app.NotificationCompat;
@@ -23,21 +22,47 @@ public class MetronomeService extends Service {
 
     private final int MILLIS_PER_MINUTE = 60 * 1000;
     private final int PORTION_OF_BEAT_TO_VIBRATE = 4;
+    private final int NANOS_PER_MILLIS = 1_000_000;
 
     private final int NOTIFICATION_ID = 421;
 
     private boolean mIsRunning;
     private int mBeatsPerMinute;
-    private Runnable mPulseRunnable = new Runnable() {
-        @Override
-        public void run() {
-            mVibrator.vibrate(MILLIS_PER_MINUTE / mBeatsPerMinute / PORTION_OF_BEAT_TO_VIBRATE);
-            mPulseHandler.postDelayed(this, MILLIS_PER_MINUTE / mBeatsPerMinute);
-        }
-    };
     private NotificationCompat.Builder mNotificationBuilder;
     private Vibrator mVibrator;
-    private Handler mPulseHandler = new Handler();
+    private Thread mPulseThread = new Thread() {
+        private final long BUFFER_NANOS = 50 * NANOS_PER_MILLIS;
+        private final int SLEEP_MILLIS = 10;
+
+        private long computeDelayMillis() {
+            return (long)MILLIS_PER_MINUTE / (long)mBeatsPerMinute;
+        }
+
+        private long computeDelayNanos() {
+            return computeDelayMillis() * (long)NANOS_PER_MILLIS;
+        }
+
+        public void run() {
+            long wakeTime = System.nanoTime();
+
+            while (mIsRunning) {
+                long now = System.nanoTime();
+
+                // Sleep if we have more than BUFFER_NANOS between now and wakeTime
+                // Spin CPU as now gets closer to wakeTime
+                if (wakeTime - now > BUFFER_NANOS) {
+                    try {
+                        Thread.sleep(SLEEP_MILLIS);
+                    } catch (InterruptedException e) {}
+                }
+                // Time to wake up
+                else if (now >= wakeTime) {
+                    mVibrator.vibrate(computeDelayMillis() / (long)PORTION_OF_BEAT_TO_VIBRATE);
+                    wakeTime += computeDelayNanos();
+                }
+            }
+        }
+    };
 
     public MetronomeService() {
     }
@@ -115,7 +140,6 @@ public class MetronomeService extends Service {
         if ((action & START_ACTION) > 0) {
             startForeground(NOTIFICATION_ID, buildNotification());
             startPulsing();
-            mIsRunning = true;
         }
 
         // Stop the service
@@ -123,7 +147,6 @@ public class MetronomeService extends Service {
             stopPulsing();
             stopForeground(true);
             stopSelf();
-            mIsRunning = false;
         }
 
         return mIsRunning ? START_STICKY : START_NOT_STICKY;
@@ -142,11 +165,15 @@ public class MetronomeService extends Service {
                 return;
             }
         }
-        mPulseHandler.postDelayed(mPulseRunnable, MILLIS_PER_MINUTE / mBeatsPerMinute);
+        mIsRunning = true;
+        mPulseThread.start();
     }
 
     private void stopPulsing() {
-        mPulseHandler.removeCallbacks(mPulseRunnable);
+        mIsRunning = false;
+        try {
+            mPulseThread.join();
+        } catch (InterruptedException e) {}
     }
 
     private Notification buildNotification() {
