@@ -1,14 +1,14 @@
 package com.nickiaconis.cadence;
 
+import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
-import android.support.v7.app.ActionBarActivity;
 import android.view.View;
 import android.widget.TextView;
 
 
-public class MetronomeActivity extends ActionBarActivity {
+public class MetronomeActivity extends Activity {
 
     private final int DEFAULT_TEMPO = 180;
 
@@ -20,18 +20,12 @@ public class MetronomeActivity extends ActionBarActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_metronome);
         mBpmText = (TextView) findViewById(R.id.bpmText);
-        mTempo = loadTempo();
-    }
-
-    @Override
-    protected void onRestoreInstanceState(Bundle savedInstanceState) {
-        super.onRestoreInstanceState(savedInstanceState);
-        mTempo = loadTempo();
     }
 
     @Override
     protected void onStart() {
         super.onStart();
+        mTempo = loadTempo();
         mBpmText.setText(Integer.toString(mTempo));
     }
 
@@ -40,7 +34,6 @@ public class MetronomeActivity extends ActionBarActivity {
         super.onSaveInstanceState(outState);
         saveTempo(mTempo);
     }
-
 
 //    @Override
 //    public boolean onCreateOptionsMenu(Menu menu) {
