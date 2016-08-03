@@ -31,8 +31,7 @@ public class MetronomeService extends Service {
     private NotificationCompat.Builder mNotificationBuilder;
     private Vibrator mVibrator;
     private Thread mPulseThread = new Thread() {
-        private final long BUFFER_NANOS = 50 * NANOS_PER_MILLIS;
-        private final int SLEEP_MILLIS = 10;
+        private final int PORTION_TO_SLEEP = 2;
 
         private long computeDelayMillis() {
             return (long)MILLIS_PER_MINUTE / (long)mBeatsPerMinute;
@@ -48,17 +47,28 @@ public class MetronomeService extends Service {
             while (mIsRunning) {
                 long now = System.nanoTime();
 
-                // Sleep if we have more than BUFFER_NANOS between now and wakeTime
-                // Spin CPU as now gets closer to wakeTime
-                if (wakeTime - now > BUFFER_NANOS) {
+                // Spin CPU unless it's time to wake up
+                if (now >= wakeTime) {
+                    long nanosToDelay = computeDelayNanos();
+                    wakeTime += nanosToDelay;
+
+                    // Vibrate
+                    long vibrateTime = computeDelayMillis() / (long)PORTION_OF_BEAT_TO_VIBRATE;
+                    mVibrator.vibrate(vibrateTime);
+
+                    // If we've lagged behind, jump ahead
+                    if (wakeTime + nanosToDelay < now) {
+                        wakeTime = now + nanosToDelay;
+                        // TODO: show notification that we've lagged maybe?
+                    }
+
+                    // Sleep for a portion of the time between now and next wake
                     try {
-                        Thread.sleep(SLEEP_MILLIS);
+                        long nanosUntilNextWake = Math.max(0, wakeTime - System.nanoTime());
+                        long nanosToSleep = nanosUntilNextWake / (long) PORTION_TO_SLEEP;
+                        long millisToSleep = nanosToSleep / (long)NANOS_PER_MILLIS;
+                        sleep(millisToSleep);
                     } catch (InterruptedException e) {}
-                }
-                // Time to wake up
-                else if (now >= wakeTime) {
-                    mVibrator.vibrate(computeDelayMillis() / (long)PORTION_OF_BEAT_TO_VIBRATE);
-                    wakeTime += computeDelayNanos();
                 }
             }
         }
