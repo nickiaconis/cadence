@@ -12,6 +12,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Vibrator;
 import android.support.v4.app.NotificationCompat;
+import android.widget.Toast;
 
 public class MetronomeService extends Service {
 
@@ -137,6 +138,7 @@ public class MetronomeService extends Service {
     private void startPulsing() {
         if (Build.VERSION.SDK_INT >= 11) {
             if (!mVibrator.hasVibrator()) {
+                Toast.makeText(getApplicationContext(), R.string.must_have_vibrator, Toast.LENGTH_LONG);
                 return;
             }
         }

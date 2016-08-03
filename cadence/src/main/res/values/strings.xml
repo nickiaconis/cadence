@@ -10,5 +10,6 @@
     <string name="bmp_default">000</string>
     <string name="action_settings">Settings</string>
     <string name="running_at_bpm">Running at %1$d BMP</string>
+    <string name="must_have_vibrator">Cadence only supports devices that support vibration.</string>
 
 </resources>
